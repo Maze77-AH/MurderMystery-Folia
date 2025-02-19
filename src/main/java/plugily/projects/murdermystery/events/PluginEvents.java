@@ -18,6 +18,7 @@
 
 package plugily.projects.murdermystery.events;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.EntityType;
@@ -99,62 +100,89 @@ public class PluginEvents implements Listener {
     plugin.getBukkitHelper().applyActionBarCooldown(attacker, swordFlyCooldown);
   }
 
-  private void createFlyingSword(Player attacker, IUser attackerUser) {
+ private void createFlyingSword(Player attacker, IUser attackerUser) {
     Location loc = attacker.getLocation();
-    Vector vec = loc.getDirection();
-    vec.normalize().multiply(plugin.getConfig().getDouble("Sword.Speed", 0.65));
+    Vector vec = loc.getDirection().normalize().multiply(plugin.getConfig().getDouble("Sword.Speed", 0.65));
     Location standStart = plugin.getBukkitHelper().rotateAroundAxisY(new Vector(1.0D, 0.0D, 0.0D), loc.getYaw()).toLocation(attacker.getWorld()).add(loc);
     standStart.setYaw(loc.getYaw());
+
     ArmorStand stand = (ArmorStand) attacker.getWorld().spawnEntity(standStart, EntityType.ARMOR_STAND);
     stand.setVisible(false);
-    if(ServerVersion.Version.isCurrentHigher(ServerVersion.Version.v1_8_8)) {
-      stand.setInvulnerable(true);
-      stand.setSilent(true);
+    if (ServerVersion.Version.isCurrentHigher(ServerVersion.Version.v1_8_8)) {
+        stand.setInvulnerable(true);
+        stand.setSilent(true);
     }
 
     VersionUtils.setItemInHand(stand, plugin.getSwordSkinManager().getMurdererSword(attacker));
-
     stand.setRightArmPose(new EulerAngle(Math.toRadians(350.0), Math.toRadians(loc.getPitch() * -1.0), Math.toRadians(90.0)));
     VersionUtils.setCollidable(stand, false);
-
     stand.setGravity(false);
     stand.setRemoveWhenFarAway(true);
-
-    if(ServerVersion.Version.isCurrentEqualOrHigher(ServerVersion.Version.v1_8_8)) {
-      stand.setMarker(true);
+    
+    if (ServerVersion.Version.isCurrentEqualOrHigher(ServerVersion.Version.v1_8_8)) {
+        stand.setMarker(true);
     }
 
     Location initialise = plugin.getBukkitHelper().rotateAroundAxisY(new Vector(-0.8D, 1.45D, 0.0D), loc.getYaw()).toLocation(attacker.getWorld()).add(standStart)
-      .add(plugin.getBukkitHelper().rotateAroundAxisY(plugin.getBukkitHelper().rotateAroundAxisX(new Vector(0.0D, 0.0D, 1.0D), loc.getPitch()), loc.getYaw()));
+            .add(plugin.getBukkitHelper().rotateAroundAxisY(plugin.getBukkitHelper().rotateAroundAxisX(new Vector(0.0D, 0.0D, 1.0D), loc.getPitch()), loc.getYaw()));
+    
     int maxRange = plugin.getConfig().getInt("Sword.Fly.Range", 20);
     double maxHitRange = plugin.getConfig().getDouble("Sword.Fly.Radius", 0.5);
-    new BukkitRunnable() {
-      @Override
-      public void run() {
-        VersionUtils.teleport(stand, standStart.add(vec));
-        initialise.add(vec);
-        initialise.getWorld().getNearbyEntities(initialise, maxHitRange, maxHitRange, maxHitRange)
-          .forEach(entity -> {
-            if(entity instanceof Player) {
-              Player victim = (Player) entity;
-              Arena arena = plugin.getArenaRegistry().getArena(victim);
-              if(arena == null) {
-                return;
-              }
-              if(!plugin.getUserManager().getUser(victim).isSpectator() && !victim.equals(attacker)) {
-                killBySword(arena, attackerUser, victim);
-                cancel();
+
+    // Folia-compatible region scheduler
+    if (Bukkit.getServer().getName().contains("Folia")) {
+        Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
+            VersionUtils.teleport(stand, standStart.add(vec));
+            initialise.add(vec);
+
+            initialise.getWorld().getNearbyEntities(initialise, maxHitRange, maxHitRange, maxHitRange)
+                .forEach(entity -> {
+                    if (entity instanceof Player victim) {
+                        Arena arena = plugin.getArenaRegistry().getArena(victim);
+                        if (arena == null) return;
+                        if (!plugin.getUserManager().getUser(victim).isSpectator() && !victim.equals(attacker)) {
+                            killBySword(arena, attackerUser, victim);
+                            task.cancel(); // Stop task on hit
+                            stand.remove();
+                        }
+                    }
+                });
+
+            if (loc.distance(initialise) > maxRange || initialise.getBlock().getType().isSolid()) {
+                task.cancel(); // Stop task if out of range or hits a block
                 stand.remove();
-              }
             }
-          });
-        if(loc.distance(initialise) > maxRange || initialise.getBlock().getType().isSolid()) {
-          cancel();
-          stand.remove();
-        }
-      }
-    }.runTaskTimer(plugin, 0, 1);
-  }
+        }, 0L, 1L);
+    } else {
+        // Legacy Bukkit scheduler for Paper/Spigot
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                VersionUtils.teleport(stand, standStart.add(vec));
+                initialise.add(vec);
+
+                initialise.getWorld().getNearbyEntities(initialise, maxHitRange, maxHitRange, maxHitRange)
+                    .forEach(entity -> {
+                        if (entity instanceof Player victim) {
+                            Arena arena = plugin.getArenaRegistry().getArena(victim);
+                            if (arena == null) return;
+                            if (!plugin.getUserManager().getUser(victim).isSpectator() && !victim.equals(attacker)) {
+                                killBySword(arena, attackerUser, victim);
+                                cancel(); // Stop task on hit
+                                stand.remove();
+                            }
+                        }
+                    });
+
+                if (loc.distance(initialise) > maxRange || initialise.getBlock().getType().isSolid()) {
+                    cancel(); // Stop task if out of range or hits a block
+                    stand.remove();
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+    }
+}
+
 
   private void killBySword(Arena arena, IUser attackerUser, Player victim) {
     Arena victimArena = plugin.getArenaRegistry().getArena(victim);

@@ -18,6 +18,7 @@
 
 package plugily.projects.murdermystery.handlers.trails;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -63,17 +64,33 @@ public class BowTrailsHandler implements Listener {
 
     Trail trail = plugin.getTrailsManager().getRandomTrail(player);
     plugin.getDebugger().debug("Spawning particle with perm {0} for player {1}", trail.getPermission(), player.getName());
-    new BukkitRunnable() {
-      @Override
-      public void run() {
-        if(projectile.isDead() || projectile.isOnGround()) {
-          plugin.getDebugger().debug("Stopped spawning particle with perm {0} for player {1}", trail.getPermission(), player.getName());
-          cancel();
-        }
-        try {
-          VersionUtils.sendParticles(trail.getName(), player, projectile.getLocation(), 3);
-        }catch(Exception ignored) {}
-      }
-    }.runTaskTimer(plugin, 0, 0);
+    if (Bukkit.getServer().getName().contains("Folia")) {
+        Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
+            if (projectile.isDead() || projectile.isOnGround()) {
+                plugin.getDebugger().debug("Stopped spawning particle with perm {0} for player {1}", 
+                    trail.getPermission(), player.getName());
+                task.cancel(); // Stop the repeating task in Folia
+                return;
+            }
+            try {
+                VersionUtils.sendParticles(trail.getName(), player, projectile.getLocation(), 3);
+            } catch (Exception ignored) {}
+        }, 0L, 1L); // 1 tick interval
+    } else {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (projectile.isDead() || projectile.isOnGround()) {
+                    plugin.getDebugger().debug("Stopped spawning particle with perm {0} for player {1}", 
+                        trail.getPermission(), player.getName());
+                    cancel();
+                    return;
+                }
+                try {
+                    VersionUtils.sendParticles(trail.getName(), player, projectile.getLocation(), 3);
+                } catch (Exception ignored) {}
+            }
+        }.runTaskTimer(plugin, 0L, 1L); // 1 tick interval (same as in Folia)
+    }
   }
 }

@@ -18,6 +18,7 @@
 
 package plugily.projects.murdermystery.arena.special.pray;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -76,9 +77,8 @@ public class PrayerRegistry {
     return prayers;
   }
 
-  public static void applyRandomPrayer(IUser user) {
+public static void applyRandomPrayer(IUser user) {
     Prayer prayer = getRandomPray();
-
     user.setStatistic("LOCAL_CURRENT_PRAY", prayer.getPrayerType().ordinal());
 
     Player player = user.getPlayer();
@@ -88,76 +88,86 @@ public class PrayerRegistry {
     String feeling = plugin.getLanguageManager().getLanguageMessage("In-Game.Messages.Arena.Playing.Special-Blocks.Pray.Praise.Feeling." + (prayer.isGoodPray() ? "Blessed" : "Cursed"));
     int praySize = prayMessage.size();
 
-    for(int a = 0; a < praySize; a++) {
-      prayMessage.set(a, prayMessage.get(a).replace("%feeling%", feeling).replace("%praise%", prayer.getPrayerDescription()));
+    for (int a = 0; a < praySize; a++) {
+        prayMessage.set(a, prayMessage.get(a).replace("%feeling%", feeling).replace("%praise%", prayer.getPrayerDescription()));
     }
 
-    switch(prayer.getPrayerType()) {
-      case BLINDNESS_CURSE:
-        XPotion.BLINDNESS.buildPotionEffect(Integer.MAX_VALUE, 1).apply(player);
-        break;
-      case BOW_TIME:
-        if(!Role.isRole(Role.ANY_DETECTIVE, user, arena)) {
-          ItemPosition.addItem(user, ItemPosition.BOW, new ItemStack(Material.BOW, 1));
-        }
-        ItemPosition.setItem(user, ItemPosition.ARROWS, new ItemStack(Material.ARROW, plugin.getConfig().getInt("Bow.Amount.Arrows.Prayer", 2)));
-        break;
-      case DETECTIVE_REVELATION:
-        Player characterType = null;
-
-        if(arena != null) {
-          characterType = arena.getCharacter(Arena.CharacterType.DETECTIVE);
-
-          if(characterType == null) {
-            characterType = arena.getCharacter(Arena.CharacterType.FAKE_DETECTIVE);
-          }
-        }
-
-        String charName = characterType == null ? "????" : characterType.getName();
-
-        for(int a = 0; a < praySize; a++) {
-          prayMessage.set(a, prayMessage.get(a).replace("%detective%", charName));
-        }
-
-        break;
-      case INCOMING_DEATH:
-        new BukkitRunnable() {
-          int time = 60;
-
-          @Override
-          public void run() {
-            if(arena == null || arena.getArenaState() != IArenaState.IN_GAME || !arena.getPlayersLeft().contains(player)) {
-              cancel();
-              return;
+    switch (prayer.getPrayerType()) {
+        case BLINDNESS_CURSE:
+            XPotion.BLINDNESS.buildPotionEffect(Integer.MAX_VALUE, 1).apply(player);
+            break;
+        case BOW_TIME:
+            if (!Role.isRole(Role.ANY_DETECTIVE, user, arena)) {
+                ItemPosition.addItem(user, ItemPosition.BOW, new ItemStack(Material.BOW, 1));
             }
-
-            if(time-- == 0) {
-              player.damage(1000);
-              cancel();
+            ItemPosition.setItem(user, ItemPosition.ARROWS, new ItemStack(Material.ARROW, plugin.getConfig().getInt("Bow.Amount.Arrows.Prayer", 2)));
+            break;
+        case DETECTIVE_REVELATION:
+            Player characterType = null;
+            if (arena != null) {
+                characterType = arena.getCharacter(Arena.CharacterType.DETECTIVE);
+                if (characterType == null) {
+                    characterType = arena.getCharacter(Arena.CharacterType.FAKE_DETECTIVE);
+                }
             }
-          }
-        }.runTaskTimer(plugin, 20, 20);
-        break;
-      case SINGLE_COMPENSATION:
-        ItemPosition.addItem(user, ItemPosition.GOLD_INGOTS, new ItemStack(Material.GOLD_INGOT, 5));
-        user.adjustStatistic("LOCAL_GOLD", 5);
-        break;
-      case SLOWNESS_CURSE:
-        XPotion.SLOWNESS.buildPotionEffect(Integer.MAX_VALUE, 1).apply(player);
-        break;
-      case GOLD_BAN:
-        ban.add(player);
-        break;
-      case GOLD_RUSH:
-        rush.add(player);
-        break;
-      default:
-        break;
+            String charName = characterType == null ? "????" : characterType.getName();
+            for (int a = 0; a < praySize; a++) {
+                prayMessage.set(a, prayMessage.get(a).replace("%detective%", charName));
+            }
+            break;
+        case INCOMING_DEATH:
+            final int[] delay = {60};
+            
+            if (Bukkit.getServer().getName().contains("Folia")) {
+                // Folia-compatible scheduler
+                Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
+                    if (arena == null || arena.getArenaState() != IArenaState.IN_GAME || !arena.getPlayersLeft().contains(player)) {
+                        task.cancel();
+                        return;
+                    }
+                    if (delay[0]-- == 0) {
+                        player.damage(1000);
+                        task.cancel();
+                    }
+                }, 20L, 20L);
+            } else {
+                // Legacy Bukkit scheduler for Paper/Spigot
+                new BukkitRunnable() {
+                    int time = 60;
+                    @Override
+                    public void run() {
+                        if (arena == null || arena.getArenaState() != IArenaState.IN_GAME || !arena.getPlayersLeft().contains(player)) {
+                            cancel();
+                            return;
+                        }
+                        if (time-- == 0) {
+                            player.damage(1000);
+                            cancel();
+                        }
+                    }
+                }.runTaskTimer(plugin, 20L, 20L);
+            }
+            break;
+        case SINGLE_COMPENSATION:
+            ItemPosition.addItem(user, ItemPosition.GOLD_INGOTS, new ItemStack(Material.GOLD_INGOT, 5));
+            user.adjustStatistic("LOCAL_GOLD", 5);
+            break;
+        case SLOWNESS_CURSE:
+            XPotion.SLOWNESS.buildPotionEffect(Integer.MAX_VALUE, 1).apply(player);
+            break;
+        case GOLD_BAN:
+            ban.add(player);
+            break;
+        case GOLD_RUSH:
+            rush.add(player);
+            break;
+        default:
+            break;
     }
-    for(String msg : prayMessage) {
-      MiscUtils.sendCenteredMessage(player, msg);
+    for (String msg : prayMessage) {
+        MiscUtils.sendCenteredMessage(player, msg);
     }
-  }
+}
 
   public static List<Player> getBan() {
     return ban;

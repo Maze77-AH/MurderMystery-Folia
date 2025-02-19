@@ -61,13 +61,23 @@ public class CorpseHandler implements Listener {
 
   public CorpseHandler(Main plugin) {
     this.plugin = plugin;
-    //run bit later than hook manager to ensure it's not null
-    Bukkit.getScheduler().runTaskLater(plugin, () -> {
-      if(plugin.getHookManager().isFeatureEnabled(HookManager.HookFeature.CORPSES)) {
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
-      }
-    }, 20 * 7);
-  }
+    
+    // Check if server is running Folia
+    boolean isFolia = Bukkit.getServer().getName().contains("Folia");
+
+    Runnable registerTask = () -> {
+        if (plugin.getHookManager().isFeatureEnabled(HookManager.HookFeature.CORPSES)) {
+            plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        }
+    };
+
+    if (isFolia) {
+        Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> registerTask.run(), 140L); // 20 * 7 = 140 ticks
+    } else {
+        Bukkit.getScheduler().runTaskLater(plugin, registerTask, 20 * 7);
+    }
+}
+
 
   public void registerLastWord(String permission, String lastWord) {
     registeredLastWords.put(permission, lastWord);
