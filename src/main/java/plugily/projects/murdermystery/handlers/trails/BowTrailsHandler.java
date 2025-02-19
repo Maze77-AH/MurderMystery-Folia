@@ -1,23 +1,6 @@
-/*
- * MurderMystery - Find the murderer, kill him and survive!
- * Copyright (c) 2022  Plugily Projects - maintained by Tigerpanzer_02 and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package plugily.projects.murdermystery.handlers.trails;
 
+import io.papermc.paper.threadedregions.scheduler.RegionScheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
@@ -29,7 +12,6 @@ import org.bukkit.scheduler.BukkitRunnable;
 import plugily.projects.minigamesbox.classic.utils.version.VersionUtils;
 import plugily.projects.murdermystery.Main;
 
-
 /**
  * @author 2Wild4You, Tigerpanzer_02
  * <p>
@@ -37,60 +19,64 @@ import plugily.projects.murdermystery.Main;
  */
 public class BowTrailsHandler implements Listener {
 
-  private final Main plugin;
+    private final Main plugin;
 
-  public BowTrailsHandler(Main plugin) {
-    this.plugin = plugin;
-    plugin.getServer().getPluginManager().registerEvents(this, plugin);
-  }
-
-  @EventHandler
-  public void onArrowShoot(EntityShootBowEvent event) {
-    if(!(event.getEntity() instanceof Player && event.getProjectile() instanceof Arrow)) {
-      return;
+    public BowTrailsHandler(Main plugin) {
+        this.plugin = plugin;
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
-    Entity projectile = event.getProjectile();
+    @EventHandler
+    public void onArrowShoot(EntityShootBowEvent event) {
+        if (!(event.getEntity() instanceof Player && event.getProjectile() instanceof Arrow)) {
+            return;
+        }
 
-    if(projectile.isDead() || projectile.isOnGround()) {
-      return;
-    }
+        Entity projectile = event.getProjectile();
 
-    Player player = (Player) event.getEntity();
+        if (projectile.isDead() || projectile.isOnGround()) {
+            return;
+        }
 
-    if(!plugin.getArenaRegistry().isInArena(player) || !plugin.getTrailsManager().gotAnyTrails(player)) {
-      return;
-    }
+        Player player = (Player) event.getEntity();
 
-    Trail trail = plugin.getTrailsManager().getRandomTrail(player);
-    plugin.getDebugger().debug("Spawning particle with perm {0} for player {1}", trail.getPermission(), player.getName());
-    if (Bukkit.getServer().getName().contains("Folia")) {
-        Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
-            if (projectile.isDead() || projectile.isOnGround()) {
-                plugin.getDebugger().debug("Stopped spawning particle with perm {0} for player {1}", 
-                    trail.getPermission(), player.getName());
-                task.cancel(); // Stop the repeating task in Folia
-                return;
-            }
-            try {
-                VersionUtils.sendParticles(trail.getName(), player, projectile.getLocation(), 3);
-            } catch (Exception ignored) {}
-        }, 0L, 1L); // 1 tick interval
-    } else {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
+        if (!plugin.getArenaRegistry().isInArena(player) || !plugin.getTrailsManager().gotAnyTrails(player)) {
+            return;
+        }
+
+        Trail trail = plugin.getTrailsManager().getRandomTrail(player);
+        plugin.getDebugger().debug("Spawning particle with perm {0} for player {1}", trail.getPermission(), player.getName());
+
+        if (Bukkit.getRegionScheduler() != null) { // ✅ Detects Folia
+            RegionScheduler scheduler = Bukkit.getRegionScheduler();
+            scheduler.runAtFixedRate(plugin, projectile.getLocation(), task -> {
                 if (projectile.isDead() || projectile.isOnGround()) {
-                    plugin.getDebugger().debug("Stopped spawning particle with perm {0} for player {1}", 
-                        trail.getPermission(), player.getName());
-                    cancel();
+                    plugin.getDebugger().debug("Stopped spawning particle with perm {0} for player {1}",
+                            trail.getPermission(), player.getName());
+                    task.cancel(); // ✅ Properly cancels the task in Folia
                     return;
                 }
                 try {
                     VersionUtils.sendParticles(trail.getName(), player, projectile.getLocation(), 3);
-                } catch (Exception ignored) {}
-            }
-        }.runTaskTimer(plugin, 0L, 1L); // 1 tick interval (same as in Folia)
+                } catch (Exception ignored) {
+                }
+            }, 0L, 1L);
+        } else { // ✅ Paper fallback
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (projectile.isDead() || projectile.isOnGround()) {
+                        plugin.getDebugger().debug("Stopped spawning particle with perm {0} for player {1}",
+                                trail.getPermission(), player.getName());
+                        cancel();
+                        return;
+                    }
+                    try {
+                        VersionUtils.sendParticles(trail.getName(), player, projectile.getLocation(), 3);
+                    } catch (Exception ignored) {
+                    }
+                }
+            }.runTaskTimer(plugin, 0L, 1L);
+        }
     }
-  }
 }

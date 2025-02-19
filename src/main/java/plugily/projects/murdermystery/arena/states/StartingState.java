@@ -101,24 +101,24 @@ public class StartingState extends PluginStartingState {
             .collect(Collectors.toList());
 
     Collections.reverse(chancesRanking);
-    List<Player> chancesPlayer = new ArrayList<>();
-    for (IUser user : chancesRanking) {
-        chancesPlayer.add(user.getPlayer());
-    }
+    List<Player> chancesPlayer = chancesRanking.stream().map(IUser::getPlayer).toList();
 
     getPlugin().getDebugger().debug("Arena {0} | Role add {1} | List {2}", arena.getId(), roleName, chancesPlayer);
 
     int amount = role == Role.MURDERER ? maxmurderer : maxdetectives;
-    for (int i = 0; i < amount; i++) {
+
+    for (int i = 0; i < amount && i < chancesRanking.size(); i++) { // ✅ Boundary check
         IUser user = chancesRanking.get(i);
         Player userPlayer = user.getPlayer();
+
         arena.setCharacter(role, userPlayer);
         arena.resetContributorValue(role, user);
         playersToSet.remove(userPlayer);
+
         new TitleBuilder("IN_GAME_MESSAGES_ARENA_PLAYING_ROLE_" + roleName)
                 .asKey()
                 .arena(arena)
-                .player(user.getPlayer())
+                .player(userPlayer)
                 .sendPlayer();
 
         if (role == Role.MURDERER) {
@@ -127,24 +127,30 @@ public class StartingState extends PluginStartingState {
             arena.getDetectiveList().add(userPlayer);
             userPlayer.getInventory().setHeldItemSlot(0);
 
-            // Folia-compatible delayed task for item assignment
-            if (Bukkit.getGlobalRegionScheduler() != null) {
-                Bukkit.getGlobalRegionScheduler().runDelayed(arena.getPlugin(), task -> {
-                    ItemPosition.setItem(user, ItemPosition.BOW, new ItemStack(Material.BOW, 1));
-                    ItemPosition.setItem(user, ItemPosition.INFINITE_ARROWS,
-                            new ItemStack(Material.ARROW, getPlugin().getConfig().getInt("Bow.Amount.Arrows.Detective", 3)));
-                }, 20L);
+            // ✅ Use RegionScheduler for Folia (Better than GlobalScheduler)
+            if (Bukkit.getRegionScheduler() != null) {
+                Bukkit.getRegionScheduler().runDelayed(arena.getPlugin(), userPlayer.getLocation(), task -> {
+                    assignDetectiveItems(user);
+                }, 20L); // ✅ Assign items after 1 second
             } else {
-                // Fallback for Paper servers
+                // Fallback for Paper/Spigot
                 Bukkit.getScheduler().runTaskLater(arena.getPlugin(), () -> {
-                    ItemPosition.setItem(user, ItemPosition.BOW, new ItemStack(Material.BOW, 1));
-                    ItemPosition.setItem(user, ItemPosition.INFINITE_ARROWS,
-                            new ItemStack(Material.ARROW, getPlugin().getConfig().getInt("Bow.Amount.Arrows.Detective", 3)));
+                    assignDetectiveItems(user);
                 }, 20L);
             }
         }
     }
 }
+
+/**
+ * Assigns the bow and arrows to detectives.
+ */
+private void assignDetectiveItems(IUser user) {
+    ItemPosition.setItem(user, ItemPosition.BOW, new ItemStack(Material.BOW, 1));
+    ItemPosition.setItem(user, ItemPosition.INFINITE_ARROWS,
+            new ItemStack(Material.ARROW, getPlugin().getConfig().getInt("Bow.Amount.Arrows.Detective", 3)));
+}
+
 
   private void getMaxRolesToSet(Arena arena) {
     int playersSize = arena.getPlayersLeft().size();

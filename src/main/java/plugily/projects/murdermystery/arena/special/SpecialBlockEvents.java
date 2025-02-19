@@ -121,15 +121,15 @@ public class SpecialBlockEvents implements Listener {
     org.bukkit.Location blockLoc = event.getClickedBlock().getLocation();
 
     VersionUtils.sendParticles("FIREWORKS_SPARK", event.getPlayer(), blockLoc, 10);
-    
+
     Item item = blockLoc.getWorld().dropItemNaturally(blockLoc.clone().add(0, 1, 0), new ItemStack(Material.POTION, 1));
     item.setPickupDelay(10000);
 
     boolean isFolia = Bukkit.getServer().getName().contains("Folia");
 
     if (isFolia) {
-        // Folia-safe item removal using RegionScheduler
-        Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
+        // Folia-optimized region-based scheduler for item removal
+        Bukkit.getRegionScheduler().runDelayed(plugin, blockLoc, task -> {
             if (item.isValid()) {
                 item.remove();
             }
@@ -151,6 +151,7 @@ public class SpecialBlockEvents implements Listener {
                     .build()
     );
 }
+
 
   private void onPrayerClick(PlayerInteractEvent event) {
     if(event.getClickedBlock().getType() != XMaterial.ENCHANTING_TABLE.parseMaterial()) {

@@ -100,7 +100,7 @@ public class PluginEvents implements Listener {
     plugin.getBukkitHelper().applyActionBarCooldown(attacker, swordFlyCooldown);
   }
 
- private void createFlyingSword(Player attacker, IUser attackerUser) {
+  private void createFlyingSword(Player attacker, IUser attackerUser) {
     Location loc = attacker.getLocation();
     Vector vec = loc.getDirection().normalize().multiply(plugin.getConfig().getDouble("Sword.Speed", 0.65));
     Location standStart = plugin.getBukkitHelper().rotateAroundAxisY(new Vector(1.0D, 0.0D, 0.0D), loc.getYaw()).toLocation(attacker.getWorld()).add(loc);
@@ -129,12 +129,14 @@ public class PluginEvents implements Listener {
     int maxRange = plugin.getConfig().getInt("Sword.Fly.Range", 20);
     double maxHitRange = plugin.getConfig().getDouble("Sword.Fly.Radius", 0.5);
 
-    // Folia-compatible region scheduler
-    if (Bukkit.getServer().getName().contains("Folia")) {
-        Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
+    boolean isFolia = Bukkit.getServer().getName().contains("Folia");
+
+    if (isFolia) {
+        Bukkit.getRegionScheduler().runAtFixedRate(plugin, attacker.getWorld(), attacker.getChunk().getX(), attacker.getChunk().getZ(), task -> {
             VersionUtils.teleport(stand, standStart.add(vec));
             initialise.add(vec);
 
+            // Only check entities within the attacker's region
             initialise.getWorld().getNearbyEntities(initialise, maxHitRange, maxHitRange, maxHitRange)
                 .forEach(entity -> {
                     if (entity instanceof Player victim) {
@@ -182,6 +184,7 @@ public class PluginEvents implements Listener {
         }.runTaskTimer(plugin, 0L, 1L);
     }
 }
+
 
 
   private void killBySword(Arena arena, IUser attackerUser, Player victim) {

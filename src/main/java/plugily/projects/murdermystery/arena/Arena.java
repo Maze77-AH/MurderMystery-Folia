@@ -212,42 +212,48 @@ public class Arena extends PluginArena {
   private BukkitTask visualTask;
 
   public void startGoldVisuals() {
-      if (goldSpawnPoints.isEmpty()) return;
+    if (goldSpawnPoints.isEmpty()) return;
 
-      World world = goldSpawnPoints.get(0).getWorld();
-      if (world == null) return;
+    World world = goldSpawnPoints.get(0).getWorld();
+    if (world == null) return;
 
-      // Check if the server supports RegionScheduler (Folia)
-      if (Bukkit.getRegionScheduler() != null) {
-          RegionScheduler scheduler = Bukkit.getRegionScheduler();
+    boolean isFolia = Bukkit.getServer().getName().contains("Folia"); // ✅ Correct Folia detection
 
-          for (Location goldLocation : goldSpawnPoints) {
-              scheduler.runAtFixedRate(plugin, goldLocation, task -> {
-                  if (!goldVisuals || !plugin.isEnabled() || getArenaState() != IArenaState.WAITING_FOR_PLAYERS) {
-                      task.cancel();
-                      return;
-                  }
+    if (isFolia) {
+        RegionScheduler scheduler = Bukkit.getRegionScheduler();
 
-                  Location effectLocation = goldLocation.clone().add(0, 0.4, 0);
-                  Bukkit.getOnlinePlayers().forEach(player ->
-                          VersionUtils.sendParticles("REDSTONE", player, effectLocation, 10));
-              }, 20L, 20L);
-          }
-      } else {
-          // Fallback for Paper & Spigot
-          visualTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-              if (!goldVisuals || !plugin.isEnabled() || goldSpawnPoints.isEmpty() || getArenaState() != IArenaState.WAITING_FOR_PLAYERS) {
-                  visualTask.cancel();
-                  return;
-              }
-              for (Location goldLocation : goldSpawnPoints) {
-                  Location effectLocation = goldLocation.clone().add(0, 0.4, 0);
-                  Bukkit.getOnlinePlayers().forEach(player ->
-                          VersionUtils.sendParticles("REDSTONE", player, effectLocation, 10));
-              }
-          }, 20L, 20L);
-      }
-  }
+        for (Location goldLocation : goldSpawnPoints) {
+            scheduler.runAtFixedRate(plugin, goldLocation, task -> {
+                if (!goldVisuals || !plugin.isEnabled() || getArenaState() != IArenaState.WAITING_FOR_PLAYERS) {
+                    task.cancel();
+                    return;
+                }
+
+                Location effectLocation = goldLocation.clone().add(0, 0.4, 0);
+                
+                // Send particles to players only in the same region
+                goldLocation.getWorld().getNearbyEntities(goldLocation, 5, 5, 5).stream()
+                        .filter(entity -> entity instanceof Player)
+                        .map(entity -> (Player) entity)
+                        .forEach(player -> VersionUtils.sendParticles("REDSTONE", player, effectLocation, 10));
+            }, 20L, 20L);
+        }
+    } else {
+        // ✅ Fallback for Paper & Spigot
+        visualTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (!goldVisuals || !plugin.isEnabled() || goldSpawnPoints.isEmpty() || getArenaState() != IArenaState.WAITING_FOR_PLAYERS) {
+                visualTask.cancel();
+                return;
+            }
+            for (Location goldLocation : goldSpawnPoints) {
+                Location effectLocation = goldLocation.clone().add(0, 0.4, 0);
+                Bukkit.getOnlinePlayers().forEach(player ->
+                        VersionUtils.sendParticles("REDSTONE", player, effectLocation, 10));
+            }
+        }, 20L, 20L);
+    }
+}
+
 
   public List<SpecialBlock> getSpecialBlocks() {
     return specialBlocks;

@@ -358,11 +358,11 @@ public class ArenaEvents extends PluginArenaEvents {
   }
 
   @EventHandler(priority = EventPriority.HIGH)
-  public void onPlayerDie(PlayerDeathEvent e) {
+public void onPlayerDie(PlayerDeathEvent e) {
     Player player = e.getEntity();
     Arena arena = plugin.getArenaRegistry().getArena(player);
-    if(arena == null) {
-      return;
+    if (arena == null) {
+        return;
     }
     IUser user = plugin.getUserManager().getUser(player);
     ComplementAccessor.getComplement().setDeathMessage(e, "");
@@ -370,25 +370,28 @@ public class ArenaEvents extends PluginArenaEvents {
     e.setDroppedExp(0);
     plugin.getCorpseHandler().spawnCorpse(player, arena);
     XPotion.BLINDNESS.buildPotionEffect(3 * 20, 1).apply(player);
-    if(arena.getArenaState() == IArenaState.STARTING) {
-      return;
-    } else if(arena.getArenaState() == IArenaState.ENDING || arena.getArenaState() == IArenaState.RESTARTING) {
-      player.getInventory().clear();
-      player.setFlying(false);
-      player.setAllowFlight(false);
-      user.setStatistic("LOCAL_GOLD", 0);
-      return;
+
+    if (arena.getArenaState() == IArenaState.STARTING) {
+        return;
+    } else if (arena.getArenaState() == IArenaState.ENDING || arena.getArenaState() == IArenaState.RESTARTING) {
+        player.getInventory().clear();
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        user.setStatistic("LOCAL_GOLD", 0);
+        return;
     }
-    if(Role.isRole(Role.MURDERER, user, arena) && arena.lastAliveMurderer()) {
-      ArenaUtils.onMurdererDeath(arena);
+
+    if (Role.isRole(Role.MURDERER, user, arena) && arena.lastAliveMurderer()) {
+        ArenaUtils.onMurdererDeath(arena);
     }
-    if(Role.isRole(Role.ANY_DETECTIVE, user) && arena.lastAliveDetective()) {
-      arena.setDetectiveDead(true);
-      if(Role.isRole(Role.FAKE_DETECTIVE, user)) {
-        arena.setCharacter(Arena.CharacterType.FAKE_DETECTIVE, null);
-      }
-      ArenaUtils.dropBowAndAnnounce(arena, player);
+    if (Role.isRole(Role.ANY_DETECTIVE, user) && arena.lastAliveDetective()) {
+        arena.setDetectiveDead(true);
+        if (Role.isRole(Role.FAKE_DETECTIVE, user)) {
+            arena.setCharacter(Arena.CharacterType.FAKE_DETECTIVE, null);
+        }
+        ArenaUtils.dropBowAndAnnounce(arena, player);
     }
+
     user.adjustStatistic("DEATHS", 1);
     user.setSpectator(true);
     VersionUtils.setCollidable(player, false);
@@ -398,24 +401,26 @@ public class ArenaEvents extends PluginArenaEvents {
     player.setAllowFlight(true);
     player.setFlying(true);
     player.getInventory().clear();
-    if(plugin.getConfigPreferences().getOption("HIDE_DEATH")) {
-      new MessageBuilder(MessageBuilder.ActionType.DEATH).player(player).arena(arena).sendArena();
+    
+    if (plugin.getConfigPreferences().getOption("HIDE_DEATH")) {
+        new MessageBuilder(MessageBuilder.ActionType.DEATH).player(player).arena(arena).sendArena();
     }
 
-    boolean isFolia = Bukkit.getServer().getName().contains("Folia");
+    boolean isFolia = Bukkit.getRegionScheduler() != null; // ✅ Correct Folia detection
 
     if (isFolia) {
-        Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
+        Bukkit.getRegionScheduler().runDelayed(plugin, player.getLocation(), task -> {
             player.spigot().respawn();
             plugin.getSpecialItemManager().addSpecialItemsOfStage(player, SpecialItem.DisplayStage.SPECTATOR);
-        }, 5);
+        }, 5L);
     } else {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             player.spigot().respawn();
             plugin.getSpecialItemManager().addSpecialItemsOfStage(player, SpecialItem.DisplayStage.SPECTATOR);
-        }, 5);
+        }, 5L);
     }
-  }
+}
+
   
   @EventHandler(priority = EventPriority.HIGHEST)
   public void onRespawn(PlayerRespawnEvent event) {

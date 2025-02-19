@@ -77,7 +77,7 @@ public class PrayerRegistry {
     return prayers;
   }
 
-public static void applyRandomPrayer(IUser user) {
+  public static void applyRandomPrayer(IUser user) {
     Prayer prayer = getRandomPray();
     user.setStatistic("LOCAL_CURRENT_PRAY", prayer.getPrayerType().ordinal());
 
@@ -117,10 +117,11 @@ public static void applyRandomPrayer(IUser user) {
             break;
         case INCOMING_DEATH:
             final int[] delay = {60};
-            
-            if (Bukkit.getServer().getName().contains("Folia")) {
-                // Folia-compatible scheduler
-                Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
+            boolean isFolia = Bukkit.getServer().getName().contains("Folia");
+
+            if (isFolia) {
+                // Folia-compatible region scheduler (per-player)
+                Bukkit.getRegionScheduler().runAtFixedRate(plugin, player.getWorld(), player.getChunk().getX(), player.getChunk().getZ(), task -> {
                     if (arena == null || arena.getArenaState() != IArenaState.IN_GAME || !arena.getPlayersLeft().contains(player)) {
                         task.cancel();
                         return;
@@ -168,6 +169,7 @@ public static void applyRandomPrayer(IUser user) {
         MiscUtils.sendCenteredMessage(player, msg);
     }
 }
+
 
   public static List<Player> getBan() {
     return ban;
