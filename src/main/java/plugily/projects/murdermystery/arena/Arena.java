@@ -20,11 +20,13 @@ package plugily.projects.murdermystery.arena;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import io.papermc.paper.threadedregions.scheduler.RegionScheduler;
 import plugily.projects.minigamesbox.api.arena.IArenaState;
 import plugily.projects.minigamesbox.api.user.IUser;
 import plugily.projects.minigamesbox.classic.arena.PluginArena;
@@ -87,6 +89,43 @@ public class Arena extends PluginArena {
     addGameStateHandler(IArenaState.STARTING, new StartingState());
     addGameStateHandler(IArenaState.WAITING_FOR_PLAYERS, new WaitingState());
   }
+
+  public boolean isGoldVisuals() {
+    return goldVisuals;
+  }
+
+  public void setGoldVisuals(boolean goldVisuals) {
+      this.goldVisuals = goldVisuals;
+      if (goldVisuals) {
+          startGoldVisuals();
+      }
+  }
+
+  public void loadSpecialBlock(SpecialBlock block) {
+    if (!specialBlocks.contains(block)) {
+        specialBlocks.add(block);
+    }
+
+    switch (block.getSpecialBlockType()) {
+        case MYSTERY_CAULDRON:
+            block.setArmorStandHologram(new ArmorStandHologram(plugin.getBukkitHelper().getBlockCenter(block.getLocation()),
+                    new MessageBuilder(plugin.getLanguageManager().getLanguageMessage("In-Game.Messages.Arena.Playing.Special-Blocks.Cauldron.Hologram")).build()));
+            break;
+        case PRAISE_DEVELOPER:
+            ArmorStandHologram prayer = new ArmorStandHologram(plugin.getBukkitHelper().getBlockCenter(block.getLocation()));
+            for (String str : plugin.getLanguageManager().getLanguageMessage("In-Game.Messages.Arena.Playing.Special-Blocks.Pray.Hologram").split(";")) {
+                prayer.appendLine(new MessageBuilder(str).build());
+            }
+            block.setArmorStandHologram(prayer);
+            break;
+        case HORSE_PURCHASE:
+        case RAPID_TELEPORTATION:
+            // Not yet implemented
+        default:
+            break;
+    }
+}
+
 
   public static void init(Main plugin) {
     Arena.plugin = plugin;
@@ -170,60 +209,44 @@ public class Arena extends PluginArena {
   public void setGoldSpawnPoints(@NotNull List<Location> goldSpawnPoints) {
     this.goldSpawnPoints = goldSpawnPoints;
   }
-
   private BukkitTask visualTask;
 
   public void startGoldVisuals() {
-    if(visualTask != null) {
-      return;
-    }
-    visualTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-      if(!goldVisuals || !plugin.isEnabled() || goldSpawnPoints.isEmpty() || getArenaState() != IArenaState.WAITING_FOR_PLAYERS) {
-        //we need to cancel it that way as the arena class is an task
-        visualTask.cancel();
-        return;
+      if (goldSpawnPoints.isEmpty()) return;
+
+      World world = goldSpawnPoints.get(0).getWorld();
+      if (world == null) return;
+
+      // Check if the server supports RegionScheduler (Folia)
+      if (Bukkit.getRegionScheduler() != null) {
+          RegionScheduler scheduler = Bukkit.getRegionScheduler();
+
+          for (Location goldLocation : goldSpawnPoints) {
+              scheduler.runAtFixedRate(plugin, goldLocation, task -> {
+                  if (!goldVisuals || !plugin.isEnabled() || getArenaState() != IArenaState.WAITING_FOR_PLAYERS) {
+                      task.cancel();
+                      return;
+                  }
+
+                  Location effectLocation = goldLocation.clone().add(0, 0.4, 0);
+                  Bukkit.getOnlinePlayers().forEach(player ->
+                          VersionUtils.sendParticles("REDSTONE", player, effectLocation, 10));
+              }, 20L, 20L);
+          }
+      } else {
+          // Fallback for Paper & Spigot
+          visualTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+              if (!goldVisuals || !plugin.isEnabled() || goldSpawnPoints.isEmpty() || getArenaState() != IArenaState.WAITING_FOR_PLAYERS) {
+                  visualTask.cancel();
+                  return;
+              }
+              for (Location goldLocation : goldSpawnPoints) {
+                  Location effectLocation = goldLocation.clone().add(0, 0.4, 0);
+                  Bukkit.getOnlinePlayers().forEach(player ->
+                          VersionUtils.sendParticles("REDSTONE", player, effectLocation, 10));
+              }
+          }, 20L, 20L);
       }
-      for(Location goldLocations : goldSpawnPoints) {
-        Location goldLocation = goldLocations.clone();
-        goldLocation.add(0, 0.4, 0);
-        Bukkit.getOnlinePlayers().forEach(player -> VersionUtils.sendParticles("REDSTONE", player, goldLocation, 10));
-      }
-    }, 20L, 20L);
-  }
-
-  public boolean isGoldVisuals() {
-    return goldVisuals;
-  }
-
-  public void setGoldVisuals(boolean goldVisuals) {
-    this.goldVisuals = goldVisuals;
-    if(goldVisuals) {
-      startGoldVisuals();
-    }
-  }
-
-  public void loadSpecialBlock(SpecialBlock block) {
-    if(!specialBlocks.contains(block)) {
-      specialBlocks.add(block);
-    }
-
-    switch(block.getSpecialBlockType()) {
-      case MYSTERY_CAULDRON:
-        block.setArmorStandHologram(new ArmorStandHologram(plugin.getBukkitHelper().getBlockCenter(block.getLocation()), new MessageBuilder(plugin.getLanguageManager().getLanguageMessage("In-Game.Messages.Arena.Playing.Special-Blocks.Cauldron.Hologram")).build()));
-        break;
-      case PRAISE_DEVELOPER:
-        ArmorStandHologram prayer = new ArmorStandHologram(plugin.getBukkitHelper().getBlockCenter(block.getLocation()));
-        for(String str : plugin.getLanguageManager().getLanguageMessage("In-Game.Messages.Arena.Playing.Special-Blocks.Pray.Hologram").split(";")) {
-          prayer.appendLine(new MessageBuilder(str).build());
-        }
-        block.setArmorStandHologram(prayer);
-        break;
-      case HORSE_PURCHASE:
-      case RAPID_TELEPORTATION:
-        //not yet implemented
-      default:
-        break;
-    }
   }
 
   public List<SpecialBlock> getSpecialBlocks() {

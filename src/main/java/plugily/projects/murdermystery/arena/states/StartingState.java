@@ -95,34 +95,56 @@ public class StartingState extends PluginStartingState {
   private void addRole(Arena arena, Role role, Set<Player> playersToSet) {
     String roleName = role.toString();
 
-    List<IUser> chancesRanking = getPlugin().getUserManager().getUsers(arena).stream().filter(user -> playersToSet.contains(user.getPlayer())).sorted(Comparator.comparingInt(user -> arena.getContributorValue(role, user))).collect(Collectors.toList());
+    List<IUser> chancesRanking = getPlugin().getUserManager().getUsers(arena).stream()
+            .filter(user -> playersToSet.contains(user.getPlayer()))
+            .sorted(Comparator.comparingInt(user -> arena.getContributorValue(role, user)))
+            .collect(Collectors.toList());
+
     Collections.reverse(chancesRanking);
     List<Player> chancesPlayer = new ArrayList<>();
-    for(IUser user : chancesRanking) {
-      chancesPlayer.add(user.getPlayer());
+    for (IUser user : chancesRanking) {
+        chancesPlayer.add(user.getPlayer());
     }
+
     getPlugin().getDebugger().debug("Arena {0} | Role add {1} | List {2}", arena.getId(), roleName, chancesPlayer);
 
     int amount = role == Role.MURDERER ? maxmurderer : maxdetectives;
-    for(int i = 0; i < amount; i++) {
-      IUser user = chancesRanking.get(i);
-      Player userPlayer = user.getPlayer();
-      arena.setCharacter(role, userPlayer);
-      arena.resetContributorValue(role, user);
-      playersToSet.remove(userPlayer);
-      new TitleBuilder("IN_GAME_MESSAGES_ARENA_PLAYING_ROLE_" + roleName).asKey().arena(arena).player(user.getPlayer()).sendPlayer();
-      if(role == Role.MURDERER) {
-        arena.getMurdererList().add(userPlayer);
-      } else if(role == Role.DETECTIVE) {
-        arena.getDetectiveList().add(userPlayer);
-        userPlayer.getInventory().setHeldItemSlot(0);
-        Bukkit.getScheduler().runTaskLater(arena.getPlugin(), () -> {
-          ItemPosition.setItem(user, ItemPosition.BOW, new ItemStack(Material.BOW, 1));
-          ItemPosition.setItem(user, ItemPosition.INFINITE_ARROWS, new ItemStack(Material.ARROW, getPlugin().getConfig().getInt("Bow.Amount.Arrows.Detective", 3)));
-        }, 20);
-      }
+    for (int i = 0; i < amount; i++) {
+        IUser user = chancesRanking.get(i);
+        Player userPlayer = user.getPlayer();
+        arena.setCharacter(role, userPlayer);
+        arena.resetContributorValue(role, user);
+        playersToSet.remove(userPlayer);
+        new TitleBuilder("IN_GAME_MESSAGES_ARENA_PLAYING_ROLE_" + roleName)
+                .asKey()
+                .arena(arena)
+                .player(user.getPlayer())
+                .sendPlayer();
+
+        if (role == Role.MURDERER) {
+            arena.getMurdererList().add(userPlayer);
+        } else if (role == Role.DETECTIVE) {
+            arena.getDetectiveList().add(userPlayer);
+            userPlayer.getInventory().setHeldItemSlot(0);
+
+            // Folia-compatible delayed task for item assignment
+            if (Bukkit.getGlobalRegionScheduler() != null) {
+                Bukkit.getGlobalRegionScheduler().runDelayed(arena.getPlugin(), task -> {
+                    ItemPosition.setItem(user, ItemPosition.BOW, new ItemStack(Material.BOW, 1));
+                    ItemPosition.setItem(user, ItemPosition.INFINITE_ARROWS,
+                            new ItemStack(Material.ARROW, getPlugin().getConfig().getInt("Bow.Amount.Arrows.Detective", 3)));
+                }, 20L);
+            } else {
+                // Fallback for Paper servers
+                Bukkit.getScheduler().runTaskLater(arena.getPlugin(), () -> {
+                    ItemPosition.setItem(user, ItemPosition.BOW, new ItemStack(Material.BOW, 1));
+                    ItemPosition.setItem(user, ItemPosition.INFINITE_ARROWS,
+                            new ItemStack(Material.ARROW, getPlugin().getConfig().getInt("Bow.Amount.Arrows.Detective", 3)));
+                }, 20L);
+            }
+        }
     }
-  }
+}
 
   private void getMaxRolesToSet(Arena arena) {
     int playersSize = arena.getPlayersLeft().size();

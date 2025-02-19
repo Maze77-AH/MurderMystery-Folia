@@ -99,33 +99,58 @@ public class SpecialBlockEvents implements Listener {
   }
 
   private void onCauldronClick(PlayerInteractEvent event) {
-    if(event.getClickedBlock().getType() != Material.CAULDRON) {
-      return;
+    if (event.getClickedBlock().getType() != Material.CAULDRON) {
+        return;
     }
 
-    if(event.getPlayer().getInventory().getItem(/* same for all roles */ ItemPosition.POTION.getOtherRolesItemPosition()) != null) {
-      new MessageBuilder("IN_GAME_MESSAGES_ARENA_PLAYING_SPECIAL_BLOCKS_CAULDRON_POTION").asKey().player(event.getPlayer()).sendPlayer();
-      return;
+    if (event.getPlayer().getInventory().getItem(ItemPosition.POTION.getOtherRolesItemPosition()) != null) {
+        new MessageBuilder("IN_GAME_MESSAGES_ARENA_PLAYING_SPECIAL_BLOCKS_CAULDRON_POTION")
+                .asKey().player(event.getPlayer()).sendPlayer();
+        return;
     }
 
     IUser user = plugin.getUserManager().getUser(event.getPlayer());
 
     int localGold = user.getStatistic("LOCAL_GOLD");
-    if(localGold < 1) {
-      new MessageBuilder("IN_GAME_MESSAGES_ARENA_PLAYING_SPECIAL_BLOCKS_NOT_ENOUGH_GOLD").asKey().player(event.getPlayer()).integer(1).sendPlayer();
-      return;
+    if (localGold < 1) {
+        new MessageBuilder("IN_GAME_MESSAGES_ARENA_PLAYING_SPECIAL_BLOCKS_NOT_ENOUGH_GOLD")
+                .asKey().player(event.getPlayer()).integer(1).sendPlayer();
+        return;
     }
 
     org.bukkit.Location blockLoc = event.getClickedBlock().getLocation();
 
     VersionUtils.sendParticles("FIREWORKS_SPARK", event.getPlayer(), blockLoc, 10);
+    
     Item item = blockLoc.getWorld().dropItemNaturally(blockLoc.clone().add(0, 1, 0), new ItemStack(Material.POTION, 1));
     item.setPickupDelay(10000);
-    Bukkit.getScheduler().runTaskLater(plugin, item::remove, 20);
+
+    boolean isFolia = Bukkit.getServer().getName().contains("Folia");
+
+    if (isFolia) {
+        // Folia-safe item removal using RegionScheduler
+        Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
+            if (item.isValid()) {
+                item.remove();
+            }
+        }, 20L); // 1 second delay
+    } else {
+        // Paper fallback
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (item.isValid()) {
+                item.remove();
+            }
+        }, 20L);
+    }
+
     user.adjustStatistic("LOCAL_GOLD", -1);
     ItemPosition.removeItem(user, new ItemStack(Material.GOLD_INGOT, 1));
-    ItemPosition.setItem(user, ItemPosition.POTION, new ItemBuilder(XMaterial.POTION.parseItem()).name(MysteryPotionRegistry.getRandomPotion().getName()).build());
-  }
+    ItemPosition.setItem(user, ItemPosition.POTION,
+            new ItemBuilder(XMaterial.POTION.parseItem())
+                    .name(MysteryPotionRegistry.getRandomPotion().getName())
+                    .build()
+    );
+}
 
   private void onPrayerClick(PlayerInteractEvent event) {
     if(event.getClickedBlock().getType() != XMaterial.ENCHANTING_TABLE.parseMaterial()) {

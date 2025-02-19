@@ -402,16 +402,21 @@ public class ArenaEvents extends PluginArenaEvents {
       new MessageBuilder(MessageBuilder.ActionType.DEATH).player(player).arena(arena).sendArena();
     }
 
-    if(arena.getArenaState() != IArenaState.ENDING && arena.getArenaState() != IArenaState.RESTARTING) {
-      arena.addDeathPlayer(player);
-    }
-    //we must call it ticks later due to instant respawn bug
-    Bukkit.getScheduler().runTaskLater(plugin, () -> {
-      player.spigot().respawn();
-      plugin.getSpecialItemManager().addSpecialItemsOfStage(player, SpecialItem.DisplayStage.SPECTATOR);
-    }, 5);
-  }
+    boolean isFolia = Bukkit.getServer().getName().contains("Folia");
 
+    if (isFolia) {
+        Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
+            player.spigot().respawn();
+            plugin.getSpecialItemManager().addSpecialItemsOfStage(player, SpecialItem.DisplayStage.SPECTATOR);
+        }, 5);
+    } else {
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            player.spigot().respawn();
+            plugin.getSpecialItemManager().addSpecialItemsOfStage(player, SpecialItem.DisplayStage.SPECTATOR);
+        }, 5);
+    }
+  }
+  
   @EventHandler(priority = EventPriority.HIGHEST)
   public void onRespawn(PlayerRespawnEvent event) {
     Player player = event.getPlayer();

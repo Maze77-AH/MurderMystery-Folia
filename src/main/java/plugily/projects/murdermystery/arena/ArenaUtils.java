@@ -19,8 +19,10 @@
 package plugily.projects.murdermystery.arena;
 
 import org.bukkit.Bukkit;
+import java.util.ArrayList;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -47,20 +49,29 @@ public class ArenaUtils extends PluginArenaUtils {
     super();
   }
 
-  public static void onMurdererDeath(Arena arena) {
-    for(Player player : arena.getPlayers()) {
-      VersionUtils.sendSubTitle(player, getPlugin().getLanguageManager().getLanguageMessage("In-Game.Messages.Game-End.Placeholders.Murderer.Stopped"), 5, 40, 5);
-      IUser loopUser = getPlugin().getUserManager().getUser(player);
-      if(Role.isRole(Role.INNOCENT, loopUser, arena)) {
-        addScore(loopUser, ScoreAction.SURVIVE_GAME, 0);
-      } else if(Role.isRole(Role.ANY_DETECTIVE, loopUser, arena)) {
-        addScore(loopUser, ScoreAction.WIN_GAME, 0);
-        addScore(loopUser, ScoreAction.DETECTIVE_WIN_GAME, 0);
-      }
+public static void onMurdererDeath(Arena arena) {
+    for (Player player : arena.getPlayers()) {
+        VersionUtils.sendSubTitle(player, 
+            getPlugin().getLanguageManager().getLanguageMessage("In-Game.Messages.Game-End.Placeholders.Murderer.Stopped"), 
+            5, 40, 5);
+        
+        IUser loopUser = getPlugin().getUserManager().getUser(player);
+        
+        if (Role.isRole(Role.INNOCENT, loopUser, arena)) {
+            addScore(loopUser, ScoreAction.SURVIVE_GAME, 0);
+        } else if (Role.isRole(Role.ANY_DETECTIVE, loopUser, arena)) {
+            addScore(loopUser, ScoreAction.WIN_GAME, 0);
+            addScore(loopUser, ScoreAction.DETECTIVE_WIN_GAME, 0);
+        }
     }
-    //we must call it ticks later due to instant respawn bug
-    Bukkit.getScheduler().runTask(getPlugin(), () -> getPlugin().getArenaManager().stopGame(false, arena));
-  }
+
+    // Ensure we have a valid world before scheduling the task
+    if (!arena.getPlayers().isEmpty()) {
+        World world = new ArrayList<>(arena.getPlayers()).get(0).getWorld();
+        Bukkit.getRegionScheduler().execute(getPlugin(), world.getSpawnLocation(), () -> getPlugin().getArenaManager().stopGame(false, arena));
+    }
+}
+
 
   public static void updateInnocentLocator(Arena arena) {
     java.util.List<Player> list = arena.getPlayersLeft();
