@@ -61,22 +61,6 @@ public class BowTrailsHandler implements Listener {
                 } catch (Exception ignored) {
                 }
             }, 0L, 1L);
-        } else { // ✅ Paper fallback
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    if (projectile.isDead() || projectile.isOnGround()) {
-                        plugin.getDebugger().debug("Stopped spawning particle with perm {0} for player {1}",
-                                trail.getPermission(), player.getName());
-                        cancel();
-                        return;
-                    }
-                    try {
-                        VersionUtils.sendParticles(trail.getName(), player, projectile.getLocation(), 3);
-                    } catch (Exception ignored) {
-                    }
-                }
-            }.runTaskTimer(plugin, 0L, 1L);
         }
     }
 }

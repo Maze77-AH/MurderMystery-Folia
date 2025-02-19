@@ -238,19 +238,6 @@ public class Arena extends PluginArena {
                         .forEach(player -> VersionUtils.sendParticles("REDSTONE", player, effectLocation, 10));
             }, 20L, 20L);
         }
-    } else {
-        // ✅ Fallback for Paper & Spigot
-        visualTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (!goldVisuals || !plugin.isEnabled() || goldSpawnPoints.isEmpty() || getArenaState() != IArenaState.WAITING_FOR_PLAYERS) {
-                visualTask.cancel();
-                return;
-            }
-            for (Location goldLocation : goldSpawnPoints) {
-                Location effectLocation = goldLocation.clone().add(0, 0.4, 0);
-                Bukkit.getOnlinePlayers().forEach(player ->
-                        VersionUtils.sendParticles("REDSTONE", player, effectLocation, 10));
-            }
-        }, 20L, 20L);
     }
 }
 

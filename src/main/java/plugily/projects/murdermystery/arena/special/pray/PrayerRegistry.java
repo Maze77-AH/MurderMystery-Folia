@@ -131,22 +131,6 @@ public class PrayerRegistry {
                         task.cancel();
                     }
                 }, 20L, 20L);
-            } else {
-                // Legacy Bukkit scheduler for Paper/Spigot
-                new BukkitRunnable() {
-                    int time = 60;
-                    @Override
-                    public void run() {
-                        if (arena == null || arena.getArenaState() != IArenaState.IN_GAME || !arena.getPlayersLeft().contains(player)) {
-                            cancel();
-                            return;
-                        }
-                        if (time-- == 0) {
-                            player.damage(1000);
-                            cancel();
-                        }
-                    }
-                }.runTaskTimer(plugin, 20L, 20L);
             }
             break;
         case SINGLE_COMPENSATION:

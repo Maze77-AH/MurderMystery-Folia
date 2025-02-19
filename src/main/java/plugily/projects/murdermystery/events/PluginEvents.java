@@ -155,33 +155,6 @@ public class PluginEvents implements Listener {
                 stand.remove();
             }
         }, 0L, 1L);
-    } else {
-        // Legacy Bukkit scheduler for Paper/Spigot
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                VersionUtils.teleport(stand, standStart.add(vec));
-                initialise.add(vec);
-
-                initialise.getWorld().getNearbyEntities(initialise, maxHitRange, maxHitRange, maxHitRange)
-                    .forEach(entity -> {
-                        if (entity instanceof Player victim) {
-                            Arena arena = plugin.getArenaRegistry().getArena(victim);
-                            if (arena == null) return;
-                            if (!plugin.getUserManager().getUser(victim).isSpectator() && !victim.equals(attacker)) {
-                                killBySword(arena, attackerUser, victim);
-                                cancel(); // Stop task on hit
-                                stand.remove();
-                            }
-                        }
-                    });
-
-                if (loc.distance(initialise) > maxRange || initialise.getBlock().getType().isSolid()) {
-                    cancel(); // Stop task if out of range or hits a block
-                    stand.remove();
-                }
-            }
-        }.runTaskTimer(plugin, 0L, 1L);
     }
 }
 
