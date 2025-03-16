@@ -18,7 +18,12 @@
 
 package plugily.projects.murdermystery;
 
+import java.util.concurrent.TimeUnit;
+
+import org.bukkit.Bukkit;
 import org.jetbrains.annotations.TestOnly;
+
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import plugily.projects.minigamesbox.classic.PluginMain;
 import plugily.projects.minigamesbox.classic.handlers.setup.SetupInventory;
 import plugily.projects.minigamesbox.classic.handlers.setup.categories.PluginSetupCategoryManager;
@@ -70,8 +75,11 @@ public class Main extends PluginMain {
     initializePluginClasses();
 
     if(getConfigPreferences().getOption("HIDE_NAMETAGS")) {
-      getServer().getScheduler().scheduleSyncRepeatingTask(this, () ->
-        getServer().getOnlinePlayers().forEach(ArenaUtils::updateNameTagsVisibility), 60, 140);
+      Bukkit.getAsyncScheduler().runAtFixedRate(this, scheduledTask -> {
+          Bukkit.getGlobalRegionScheduler().execute(this, () ->
+              Bukkit.getOnlinePlayers().forEach(ArenaUtils::updateNameTagsVisibility)
+          );
+      }, 60L, 140L, TimeUnit.MILLISECONDS);
     }
 
     getDebugger().debug("Full {0} plugin enabled", getName());

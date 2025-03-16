@@ -18,6 +18,9 @@
 
 package plugily.projects.murdermystery.handlers.trails;
 
+import java.util.concurrent.TimeUnit;
+
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -25,6 +28,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.scheduler.BukkitRunnable;
+
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import plugily.projects.minigamesbox.classic.utils.version.VersionUtils;
 import plugily.projects.murdermystery.Main;
 
@@ -63,17 +68,21 @@ public class BowTrailsHandler implements Listener {
 
     Trail trail = plugin.getTrailsManager().getRandomTrail(player);
     plugin.getDebugger().debug("Spawning particle with perm {0} for player {1}", trail.getPermission(), player.getName());
-    new BukkitRunnable() {
-      @Override
-      public void run() {
-        if(projectile.isDead() || projectile.isOnGround()) {
-          plugin.getDebugger().debug("Stopped spawning particle with perm {0} for player {1}", trail.getPermission(), player.getName());
-          cancel();
-        }
-        try {
-          VersionUtils.sendParticles(trail.getName(), player, projectile.getLocation(), 3);
-        }catch(Exception ignored) {}
-      }
-    }.runTaskTimer(plugin, 0, 0);
+
+    Bukkit.getAsyncScheduler().runAtFixedRate(plugin, scheduledTask -> {
+        // Switch execution to the main thread for Bukkit API calls
+        Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
+            if (projectile.isDead() || projectile.isOnGround()) {
+                plugin.getDebugger().debug("Stopped spawning particle with perm {0} for player {1}",
+                        trail.getPermission(), player.getName());
+                scheduledTask.cancel();
+                return;
+            }
+            try {
+                VersionUtils.sendParticles(trail.getName(), player, projectile.getLocation(), 3);
+            } catch (Exception ignored) {}
+        });
+    }, 0L, 0L, TimeUnit.MILLISECONDS);
+
   }
 }

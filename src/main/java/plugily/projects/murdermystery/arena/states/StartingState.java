@@ -36,6 +36,7 @@ import plugily.projects.murdermystery.arena.special.pray.PrayerRegistry;
 import plugily.projects.murdermystery.utils.ItemPosition;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -116,10 +117,15 @@ public class StartingState extends PluginStartingState {
       } else if(role == Role.DETECTIVE) {
         arena.getDetectiveList().add(userPlayer);
         userPlayer.getInventory().setHeldItemSlot(0);
-        Bukkit.getScheduler().runTaskLater(arena.getPlugin(), () -> {
-          ItemPosition.setItem(user, ItemPosition.BOW, new ItemStack(Material.BOW, 1));
-          ItemPosition.setItem(user, ItemPosition.INFINITE_ARROWS, new ItemStack(Material.ARROW, getPlugin().getConfig().getInt("Bow.Amount.Arrows.Detective", 3)));
-        }, 20);
+        Bukkit.getAsyncScheduler().runDelayed(arena.getPlugin(), task -> {
+            Bukkit.getGlobalRegionScheduler().execute(arena.getPlugin(), () -> {
+                ItemPosition.setItem(user, ItemPosition.BOW, new ItemStack(Material.BOW, 1));
+                ItemPosition.setItem(user, ItemPosition.INFINITE_ARROWS, new ItemStack(
+                    Material.ARROW,
+                    arena.getPlugin().getConfig().getInt("Bow.Amount.Arrows.Detective", 3)
+                ));
+            });
+        }, 20L, TimeUnit.MILLISECONDS);
       }
     }
   }

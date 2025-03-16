@@ -59,7 +59,9 @@ public class ArenaUtils extends PluginArenaUtils {
       }
     }
     //we must call it ticks later due to instant respawn bug
-    Bukkit.getScheduler().runTask(getPlugin(), () -> getPlugin().getArenaManager().stopGame(false, arena));
+    Bukkit.getGlobalRegionScheduler().execute(getPlugin(), () ->
+    getPlugin().getArenaManager().stopGame(false, arena)
+    );
   }
 
   public static void updateInnocentLocator(Arena arena) {

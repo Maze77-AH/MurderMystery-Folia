@@ -45,6 +45,7 @@ import plugily.projects.murdermystery.arena.corpse.Stand;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author Plajer
@@ -62,11 +63,13 @@ public class CorpseHandler implements Listener {
   public CorpseHandler(Main plugin) {
     this.plugin = plugin;
     //run bit later than hook manager to ensure it's not null
-    Bukkit.getScheduler().runTaskLater(plugin, () -> {
-      if(plugin.getHookManager().isFeatureEnabled(HookManager.HookFeature.CORPSES)) {
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
-      }
-    }, 20 * 7);
+    Bukkit.getAsyncScheduler().runDelayed(plugin, task -> 
+      Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
+        if (plugin.getHookManager().isFeatureEnabled(HookManager.HookFeature.CORPSES)) {
+          plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        }
+      })
+    , 20L * 7, TimeUnit.MILLISECONDS);
   }
 
   public void registerLastWord(String permission, String lastWord) {
@@ -99,11 +102,17 @@ public class CorpseHandler implements Listener {
       plugin.getHologramManager().getArmorStands().add(stand);
       ArmorStandHologram hologram = getLastWordsHologram(player);
       arena.addHead(new Stand(hologram, stand));
-      Bukkit.getScheduler().runTaskLater(plugin, () -> {
-        hologram.delete();
-        plugin.getHologramManager().getArmorStands().remove(stand);
-        Bukkit.getScheduler().runTaskLater(plugin, stand::remove, 20 * 20);
-      }, 15 * 20);
+      Bukkit.getAsyncScheduler().runDelayed(plugin, task -> {
+        // Run the first set of actions on the main thread:
+        Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
+            hologram.delete();
+            plugin.getHologramManager().getArmorStands().remove(stand);
+        });
+        // Schedule the stand removal after 20*20 ticks:
+        Bukkit.getAsyncScheduler().runDelayed(plugin, task2 ->
+            Bukkit.getGlobalRegionScheduler().execute(plugin, stand::remove)
+        , 20L * 20, TimeUnit.MILLISECONDS);
+    }, 15L * 20, TimeUnit.MILLISECONDS);
       return;
     }
     ArmorStandHologram hologram = getLastWordsHologram(player);
@@ -111,10 +120,15 @@ public class CorpseHandler implements Listener {
     lastSpawnedCorpse = corpse;
     //spawns 2 corpses - Corpses.CorpseData corpse = lastSpawnedCorpse = CorpseAPI.spawnCorpse(player, player.getLocation());
     arena.addCorpse(new Corpse(hologram, corpse));
-    Bukkit.getScheduler().runTaskLater(plugin, () -> {
-      hologram.delete();
-      Bukkit.getScheduler().runTaskLater(plugin, corpse::destroyCorpseFromEveryone, 20 * 20);
-    }, 15 * 20);
+    Bukkit.getAsyncScheduler().runDelayed(plugin, task -> {
+      // Run the hologram deletion on the main thread
+      Bukkit.getGlobalRegionScheduler().execute(plugin, hologram::delete);
+      
+      // Schedule corpse destruction after 20 * 20 ticks
+      Bukkit.getAsyncScheduler().runDelayed(plugin, task2 ->
+          Bukkit.getGlobalRegionScheduler().execute(plugin, corpse::destroyCorpseFromEveryone),
+      20L * 20, TimeUnit.MILLISECONDS);
+  }, 15L * 20, TimeUnit.MILLISECONDS);  
   }
 
   private ArmorStandHologram getLastWordsHologram(Player player) {

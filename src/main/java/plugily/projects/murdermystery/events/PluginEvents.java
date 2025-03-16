@@ -18,6 +18,9 @@
 
 package plugily.projects.murdermystery.events;
 
+import java.util.concurrent.TimeUnit;
+
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.EntityType;
@@ -33,6 +36,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.EulerAngle;
 import org.bukkit.util.Vector;
+
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import plugily.projects.minigamesbox.api.user.IUser;
 import plugily.projects.minigamesbox.classic.utils.version.ServerVersion;
 import plugily.projects.minigamesbox.classic.utils.version.VersionUtils;
@@ -124,36 +129,47 @@ public class PluginEvents implements Listener {
       stand.setMarker(true);
     }
 
-    Location initialise = plugin.getBukkitHelper().rotateAroundAxisY(new Vector(-0.8D, 1.45D, 0.0D), loc.getYaw()).toLocation(attacker.getWorld()).add(standStart)
-      .add(plugin.getBukkitHelper().rotateAroundAxisY(plugin.getBukkitHelper().rotateAroundAxisX(new Vector(0.0D, 0.0D, 1.0D), loc.getPitch()), loc.getYaw()));
-    int maxRange = plugin.getConfig().getInt("Sword.Fly.Range", 20);
-    double maxHitRange = plugin.getConfig().getDouble("Sword.Fly.Radius", 0.5);
-    new BukkitRunnable() {
-      @Override
-      public void run() {
-        VersionUtils.teleport(stand, standStart.add(vec));
-        initialise.add(vec);
-        initialise.getWorld().getNearbyEntities(initialise, maxHitRange, maxHitRange, maxHitRange)
-          .forEach(entity -> {
-            if(entity instanceof Player) {
-              Player victim = (Player) entity;
-              Arena arena = plugin.getArenaRegistry().getArena(victim);
-              if(arena == null) {
-                return;
+    // ... inside your method where variables like loc, standStart, vec, stand, attacker, attackerUser, etc. are defined
+
+    Location initialise = plugin.getBukkitHelper()
+        .rotateAroundAxisY(new Vector(-0.8D, 1.45D, 0.0D), loc.getYaw())
+        .toLocation(attacker.getWorld())
+        .add(standStart)
+        .add(plugin.getBukkitHelper().rotateAroundAxisY(
+            plugin.getBukkitHelper().rotateAroundAxisX(new Vector(0.0D, 0.0D, 1.0D), loc.getPitch()),
+            loc.getYaw()
+        ));
+
+        int maxRange = plugin.getConfig().getInt("Sword.Fly.Range", 20);
+        double maxHitRange = plugin.getConfig().getDouble("Sword.Fly.Radius", 0.5);
+
+          Bukkit.getAsyncScheduler().runAtFixedRate(plugin, scheduledTask -> {
+          // Hand off to the main thread to safely interact with Bukkit API objects
+          Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
+              VersionUtils.teleport(stand, standStart.add(vec));
+              initialise.add(vec);
+              initialise.getWorld().getNearbyEntities(initialise, maxHitRange, maxHitRange, maxHitRange)
+                  .forEach(entity -> {
+                      if (entity instanceof Player) {
+                          Player victim = (Player) entity;
+                          Arena arena = plugin.getArenaRegistry().getArena(victim);
+                          if (arena == null) {
+                              return;
+                          }
+                          if (!plugin.getUserManager().getUser(victim).isSpectator() && !victim.equals(attacker)) {
+                              killBySword(arena, attackerUser, victim);
+                              scheduledTask.cancel();
+                              stand.remove();
+                          }
+                      }
+                  });
+              if (loc.distance(initialise) > maxRange || initialise.getBlock().getType().isSolid()) {
+                  scheduledTask.cancel();
+                  stand.remove();
               }
-              if(!plugin.getUserManager().getUser(victim).isSpectator() && !victim.equals(attacker)) {
-                killBySword(arena, attackerUser, victim);
-                cancel();
-                stand.remove();
-              }
-            }
           });
-        if(loc.distance(initialise) > maxRange || initialise.getBlock().getType().isSolid()) {
-          cancel();
-          stand.remove();
-        }
-      }
-    }.runTaskTimer(plugin, 0, 1);
+      }, 0L, 1L, TimeUnit.MILLISECONDS);
+
   }
 
   private void killBySword(Arena arena, IUser attackerUser, Player victim) {

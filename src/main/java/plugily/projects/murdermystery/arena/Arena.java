@@ -25,6 +25,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import plugily.projects.minigamesbox.api.arena.IArenaState;
 import plugily.projects.minigamesbox.api.user.IUser;
 import plugily.projects.minigamesbox.classic.arena.PluginArena;
@@ -46,6 +48,7 @@ import plugily.projects.murdermystery.arena.states.StartingState;
 import plugily.projects.murdermystery.arena.states.WaitingState;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author Tigerpanzer_02
@@ -177,18 +180,21 @@ public class Arena extends PluginArena {
     if(visualTask != null) {
       return;
     }
-    visualTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-      if(!goldVisuals || !plugin.isEnabled() || goldSpawnPoints.isEmpty() || getArenaState() != IArenaState.WAITING_FOR_PLAYERS) {
-        //we need to cancel it that way as the arena class is an task
-        visualTask.cancel();
-        return;
-      }
-      for(Location goldLocations : goldSpawnPoints) {
-        Location goldLocation = goldLocations.clone();
-        goldLocation.add(0, 0.4, 0);
-        Bukkit.getOnlinePlayers().forEach(player -> VersionUtils.sendParticles("REDSTONE", player, goldLocation, 10));
-      }
-    }, 20L, 20L);
+    Bukkit.getAsyncScheduler().runAtFixedRate(plugin, task -> {
+      Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
+          if (!goldVisuals || !plugin.isEnabled() || goldSpawnPoints.isEmpty() || getArenaState() != IArenaState.WAITING_FOR_PLAYERS) {
+              task.cancel();
+              return;
+          }
+          for (Location goldLocations : goldSpawnPoints) {
+              Location goldLocation = goldLocations.clone();
+              goldLocation.add(0, 0.4, 0);
+              Bukkit.getOnlinePlayers().forEach(player ->
+                  VersionUtils.sendParticles("REDSTONE", player, goldLocation, 10)
+              );
+          }
+      });
+  }, 20L, 20L, TimeUnit.MILLISECONDS);
   }
 
   public boolean isGoldVisuals() {

@@ -18,6 +18,8 @@
 
 package plugily.projects.murdermystery.arena.special;
 
+import java.util.concurrent.TimeUnit;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Item;
@@ -121,7 +123,8 @@ public class SpecialBlockEvents implements Listener {
     VersionUtils.sendParticles("FIREWORKS_SPARK", event.getPlayer(), blockLoc, 10);
     Item item = blockLoc.getWorld().dropItemNaturally(blockLoc.clone().add(0, 1, 0), new ItemStack(Material.POTION, 1));
     item.setPickupDelay(10000);
-    Bukkit.getScheduler().runTaskLater(plugin, item::remove, 20);
+    Bukkit.getAsyncScheduler().runDelayed(plugin, task -> 
+        Bukkit.getGlobalRegionScheduler().execute(plugin, item::remove), 20L, TimeUnit.MILLISECONDS);
     user.adjustStatistic("LOCAL_GOLD", -1);
     ItemPosition.removeItem(user, new ItemStack(Material.GOLD_INGOT, 1));
     ItemPosition.setItem(user, ItemPosition.POTION, new ItemBuilder(XMaterial.POTION.parseItem()).name(MysteryPotionRegistry.getRandomPotion().getName()).build());

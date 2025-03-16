@@ -18,12 +18,15 @@
 
 package plugily.projects.murdermystery.arena.special.pray;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import plugily.projects.minigamesbox.api.arena.IArenaState;
 import plugily.projects.minigamesbox.api.user.IUser;
 import plugily.projects.minigamesbox.classic.handlers.language.MessageBuilder;
@@ -38,6 +41,7 @@ import plugily.projects.murdermystery.utils.ItemPosition;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author Plajer
@@ -121,22 +125,21 @@ public class PrayerRegistry {
 
         break;
       case INCOMING_DEATH:
-        new BukkitRunnable() {
-          int time = 60;
+      final int[] time = {60};
 
-          @Override
-          public void run() {
-            if(arena == null || arena.getArenaState() != IArenaState.IN_GAME || !arena.getPlayersLeft().contains(player)) {
-              cancel();
-              return;
-            }
+      Bukkit.getAsyncScheduler().runAtFixedRate(plugin, scheduledTask -> {
+          Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
+              if (arena == null || arena.getArenaState() != IArenaState.IN_GAME || !arena.getPlayersLeft().contains(player)) {
+                  scheduledTask.cancel();
+                  return;
+              }
+              if (time[0]-- == 0) {
+                  player.damage(1000);
+                  scheduledTask.cancel();
+              }
+          });
+      }, 20L, 20L, TimeUnit.MILLISECONDS);
 
-            if(time-- == 0) {
-              player.damage(1000);
-              cancel();
-            }
-          }
-        }.runTaskTimer(plugin, 20, 20);
         break;
       case SINGLE_COMPENSATION:
         ItemPosition.addItem(user, ItemPosition.GOLD_INGOTS, new ItemStack(Material.GOLD_INGOT, 5));

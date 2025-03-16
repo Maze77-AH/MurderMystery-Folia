@@ -18,6 +18,8 @@
 
 package plugily.projects.murdermystery.arena;
 
+import java.util.concurrent.TimeUnit;
+
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
@@ -406,10 +408,12 @@ public class ArenaEvents extends PluginArenaEvents {
       arena.addDeathPlayer(player);
     }
     //we must call it ticks later due to instant respawn bug
-    Bukkit.getScheduler().runTaskLater(plugin, () -> {
-      player.spigot().respawn();
-      plugin.getSpecialItemManager().addSpecialItemsOfStage(player, SpecialItem.DisplayStage.SPECTATOR);
-    }, 5);
+    Bukkit.getAsyncScheduler().runDelayed(plugin, task -> {
+        Bukkit.getGlobalRegionScheduler().execute(plugin, () -> {
+            player.spigot().respawn();
+            plugin.getSpecialItemManager().addSpecialItemsOfStage(player, SpecialItem.DisplayStage.SPECTATOR);
+        });
+    }, 5, TimeUnit.MILLISECONDS);
   }
 
   @EventHandler(priority = EventPriority.HIGHEST)
